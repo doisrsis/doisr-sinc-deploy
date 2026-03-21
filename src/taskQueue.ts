@@ -2,6 +2,7 @@ import * as async from 'async';
 import * as vscode from 'vscode';
 import { Task, SyncConfigItem } from './types/config';
 import { FtpClient } from './ftpClient';
+import { SftpClient } from './sftpClient';
 import { outputChannel } from './output';
 import { statusBar } from './statusBar';
 
@@ -35,23 +36,28 @@ export class TaskQueue {
   }
 
   private static async processTask(task: Task) {
-    let client: FtpClient | null = null;
+    let client: FtpClient | SftpClient | null = null;
     const execute = async (t: Task) => {
       try {
         if (t.config.type === 'ftp') {
           client = new FtpClient(t.config);
-          await client.connect();
-          
-          if (t.operationType === 'upload') {
-             outputChannel.logInfo(`[${t.configName}] Subindo: ${t.localPath}`);
-             await client.uploadFile(t);
-          } else if (t.operationType === 'delete') {
-             outputChannel.logInfo(`[${t.configName}] Removendo: ${t.remotePath}`);
-             await client.remove(t);
-          }
-          
-          await client.close();
+        } else if (t.config.type === 'sftp') {
+          client = new SftpClient(t.config);
+        } else {
+          throw new Error('Tipo de conexão não suportado.');
         }
+
+        await client.connect();
+        
+        if (t.operationType === 'upload') {
+           outputChannel.logInfo(`[${t.configName}] Subindo: ${t.localPath}`);
+           await client.uploadFile(t);
+        } else if (t.operationType === 'delete') {
+           outputChannel.logInfo(`[${t.configName}] Removendo: ${t.remotePath}`);
+           await client.remove(t);
+        }
+        
+        await client.close();
         
       } catch (error: any) {
         if (client) {

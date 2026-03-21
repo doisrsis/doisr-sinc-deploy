@@ -19,13 +19,18 @@ export class FtpClient {
   public async connect() {
     try {
       if (this.config.host) {
-        outputChannel.logInfo(`Conectando ao FTP: ${this.config.host}:${this.config.port || 21}`);
+        outputChannel.logInfo(`Conectando ao FTP: ${this.config.host}:${this.config.port || 21}${this.config.secure ? ' (Seguro/FTPS)' : ''}`);
+        
+        // Ativa logs verbosos no output channel para debugar a conexão
+        this.client.ftp.verbose = false; // Mude para true se precisar debugar muito a fundo
+
         await this.client.access({
           host: this.config.host,
           port: this.config.port || 21,
           user: this.config.username,
           password: this.config.password,
-          secure: false // Ajustável no futuro
+          secure: this.config.secure !== undefined ? this.config.secure : false,
+          secureOptions: { rejectUnauthorized: false } // Ignora certificados autoassinados (comum em cPanel/WHM)
         });
       }
     } catch (err) {

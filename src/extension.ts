@@ -50,52 +50,11 @@ export function activate(context: vscode.ExtensionContext) {
     const fsPath = uri.fsPath;
     const stat = fs.statSync(fsPath);
     
-    if (stat.isDirectory()) {
-      // Implementação futura de upload de diretório
-      vscode.window.showWarningMessage('Upload de diretório será implementado em breve. Selecione arquivos.');
-      return;
-    }
-
-    // Gerar caminho remoto (ex: /public_html/src/index.html)
-    const rootPath = getRootPath(fsPath);
-    const relativePath = path.relative(rootPath, fsPath);
-    const remotePath = path.posix.join(config.remotePath || '/', getNormalPath(relativePath));
-
-    TaskQueue.addTask({
-      config,
-      configName: name,
-      localPath: fsPath,
-      remotePath: remotePath,
-      operationType: 'upload',
-      isDirectory: false
-    });
-  });
-  context.subscriptions.push(disposableUploadFile);
-
-  // Listener: On Save Document
-  const onSave = debounce(async (document: vscode.TextDocument) => {
-    const filePath = document.uri.fsPath;
-    const configs = await getConfigManager();
-    if (!configs) return;
-
-    for (const [name, config] of Object.entries(configs)) {
-      if (!config.upload_on_save) continue; // Ignora se não é on-save
-      if (config.type !== 'ftp') continue;  // Fase 1 só lida com ftp
-
-      // Checa ignorados (.gitignore + excludePath)
-      const ignored = await isIgnore(config, filePath);
-      if (ignored) {
-         outputChannel.logInfo(`Arquivo ignorado (não subirá automaticamente): ${filePath}`);
-         continue;
-      }
-
+    // Função para enfileirar arquivos
+    const queueFile = (filePath: string) => {
       const rootPath = getRootPath(filePath);
-      if (!filePath.startsWith(rootPath)) continue; // Fora do workspace
-
       const relativePath = path.relative(rootPath, filePath);
       const remotePath = path.posix.join(config.remotePath || '/', getNormalPath(relativePath));
-
-      outputChannel.logInfo(`[${name}] Detectado salvamento em: ${relativePath}`);
 
       TaskQueue.addTask({
         config,
@@ -105,16 +64,101 @@ export function activate(context: vscode.ExtensionContext) {
         operationType: 'upload',
         isDirectory: false
       });
-    }
-  }, 800);
+    };
 
+    if (stat.isDirectory()) {
+      // Varredura recursiva de diretório
+      outputChannel.logInfo(`[${name}] Preparando upload do diretório: ${fsPath}`);
+      
+      const scanDir = (dir: string) => {
+        const files = fs.readdirSync(dir);
+        for (const file of files) {
+          const fullPath = path.join(dir, file);
+          if (fs.statSync(fullPath).isDirectory()) {
+            scanDir(fullPath);
+          } else {
+            queueFile(fullPath);
+          }
+        }
+      };
+      
+      scanDir(fsPath);
+      return;
+    }
+
+    // Se for arquivo único
+    queueFile(fsPath);
+  });
+  context.subscriptions.push(disposableUploadFile);
+
+  // Anti-duplicação e throttling por arquivo
+  const filePending = new Set<string>();
+  const handleFileChange = async (filePath: string, source: 'save' | 'watch') => {
+    // Escapa arquivos virtuais ou de lixo muito rápido
+    if (filePath.includes('.git') || filePath.includes('node_modules') || filePath.includes('.vscode')) return;
+
+    if (filePending.has(filePath)) return;
+    filePending.add(filePath);
+    
+    setTimeout(async () => {
+      filePending.delete(filePath);
+      
+      try {
+        const stat = fs.statSync(filePath);
+        if (stat.isDirectory()) return; // Por ora, ignorar subida de pastas isoladas
+      } catch (e) {
+        return; // Arquivo deletado não deve subir
+      }
+
+      const configs = await getConfigManager();
+      if (!configs) return;
+
+      for (const [name, config] of Object.entries(configs)) {
+        if (source === 'save' && !config.upload_on_save && !config.watch) continue;
+        if (source === 'watch' && !config.watch) continue;
+
+        const ignored = await isIgnore(config, filePath);
+        if (ignored) continue;
+
+        const rootPath = getRootPath(filePath);
+        if (!filePath.startsWith(rootPath)) continue; 
+
+        const relativePath = path.relative(rootPath, filePath);
+        const remotePath = path.posix.join(config.remotePath || '/', getNormalPath(relativePath));
+
+        outputChannel.logInfo(`[${name}] ${source === 'watch' ? 'Modificação detectada (Watcher)' : 'Salvamento detectado'}: ${relativePath}`);
+
+        TaskQueue.addTask({
+          config,
+          configName: name,
+          localPath: filePath,
+          remotePath: remotePath,
+          operationType: 'upload',
+          isDirectory: false
+        });
+      }
+    }, 500); // 500ms debounce
+  };
+
+  // Listener: On Save Document
   context.subscriptions.push(
     vscode.workspace.onDidSaveTextDocument((document) => {
-       // Evita arquivos virtuais (output, git, etc)
        if (document.uri.scheme !== 'file') return;
-       onSave(document);
+       handleFileChange(document.uri.fsPath, 'save');
     })
   );
+
+  // Listener: File System Watcher
+  const watcher = vscode.workspace.createFileSystemWatcher('**/*');
+  
+  watcher.onDidChange(uri => {
+    if (uri.scheme === 'file') handleFileChange(uri.fsPath, 'watch');
+  });
+  watcher.onDidCreate(uri => {
+    if (uri.scheme === 'file') handleFileChange(uri.fsPath, 'watch');
+  });
+  
+  context.subscriptions.push(watcher);
 }
 
 export function deactivate() {

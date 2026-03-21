@@ -11,6 +11,7 @@ export interface SyncConfigItem {
   remotePath: string;
 
   // Comportamento
+  secure?: boolean | 'implicit';
   upload_on_save?: boolean;
   watch?: boolean;
   default?: boolean;
