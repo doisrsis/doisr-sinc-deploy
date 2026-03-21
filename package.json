@@ -1,0 +1,117 @@
+{
+  "name": "doisr-deploy",
+  "displayName": "doisr-deploy (FTP/SFTP)",
+  "description": "Ferramenta de sincronização FTP/SFTP/SSH para o dia a dia. Sobe arquivos automaticamente ao salvar.",
+  "version": "1.0.0",
+  "publisher": "Rafael Dias",
+  "author": "Rafael Dias - doisr.com.br",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": [
+    "Other",
+    "Snippets",
+    "Programming Languages"
+  ],
+  "keywords": [
+    "ftp",
+    "sftp",
+    "ssh",
+    "upload",
+    "sync",
+    "deploy"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "doisr.addConfig",
+        "title": "Adicionar Configuração...",
+        "category": "Doisr Deploy",
+        "icon": "$(add)"
+      },
+      {
+        "command": "doisr.uploadFile",
+        "title": "Fazer Upload",
+        "category": "Doisr Deploy",
+        "icon": "$(cloud-upload)"
+      },
+      {
+        "command": "doisr.showOutput",
+        "title": "Mostrar Logs",
+        "category": "Doisr Deploy",
+        "icon": "$(output)"
+      },
+      {
+        "command": "doisr.clearCache",
+        "title": "Limpar Cache da Sessão",
+        "category": "Doisr Deploy",
+        "icon": "$(clear-all)"
+      }
+    ],
+    "menus": {
+      "explorer/context": [
+        {
+          "submenu": "filemenu/doisr_deploy",
+          "group": "2_workspace@1"
+        }
+      ],
+      "filemenu/doisr_deploy": [
+        {
+          "command": "doisr.uploadFile",
+          "group": "1_workspace@1"
+        }
+      ]
+    },
+    "submenus": [
+      {
+        "id": "filemenu/doisr_deploy",
+        "label": "Doisr Deploy (Sincronizar)"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run package",
+    "compile": "webpack",
+    "watch": "webpack --watch",
+    "package": "webpack --mode production --devtool hidden-source-map",
+    "compile-tests": "tsc -p . --outDir out",
+    "watch-tests": "tsc -p . -w --outDir out",
+    "pretest": "npm run compile-tests && npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js"
+  },
+  "devDependencies": {
+    "@types/async": "^3.2.20",
+    "@types/fs-extra": "^11.0.1",
+    "@types/glob": "^8.1.0",
+    "@types/minimatch": "^5.1.2",
+    "@types/mocha": "^10.0.1",
+    "@types/node": "16.x",
+    "@types/vscode": "^1.74.0",
+    "@typescript-eslint/eslint-plugin": "^5.59.1",
+    "@typescript-eslint/parser": "^5.59.1",
+    "eslint": "^8.39.0",
+    "glob": "^8.1.0",
+    "mocha": "^10.2.0",
+    "ts-loader": "^9.4.2",
+    "typescript": "^5.0.4",
+    "webpack": "^5.82.0",
+    "webpack-cli": "^5.1.0"
+  },
+  "dependencies": {
+    "async": "^3.2.4",
+    "async-mutex": "^0.4.0",
+    "basic-ftp": "^5.0.3",
+    "crypto-js": "^4.1.1",
+    "dayjs": "^1.11.7",
+    "fs-extra": "^11.1.1",
+    "jsonc-parser": "^3.2.0",
+    "minimatch": "^9.0.0",
+    "ssh2-sftp-client": "^9.1.0"
+  }
+}
