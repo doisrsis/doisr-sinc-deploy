@@ -3,7 +3,7 @@
   "displayName": "doisr-deploy (FTP/SFTP)",
   "description": "Ferramenta de sincronização FTP/SFTP/SSH para o dia a dia. Sobe arquivos automaticamente ao salvar.",
   "version": "1.0.0",
-  "publisher": "Rafael Dias",
+  "publisher": "rafaeldias",
   "author": "Rafael Dias - doisr.com.br",
   "license": "MIT",
   "engines": {
@@ -57,6 +57,18 @@
         "title": "Atualizar Lista",
         "category": "Doisr Deploy",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "doisr.syncServer",
+        "title": "Sincronizar Workspace",
+        "category": "Doisr Deploy",
+        "icon": "$(sync)"
+      },
+      {
+        "command": "doisr.editConfig",
+        "title": "Editar doisr_deploy.jsonc",
+        "category": "Doisr Deploy",
+        "icon": "$(edit)"
       }
     ],
     "viewsContainers": {
@@ -84,6 +96,18 @@
           "command": "doisr.refreshServers",
           "when": "view == doisrDeployServers",
           "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "doisr.syncServer",
+          "when": "view == doisrDeployServers && viewItem == serverRoot",
+          "group": "inline"
+        },
+        {
+          "command": "doisr.editConfig",
+          "when": "view == doisrDeployServers && viewItem == serverRoot",
+          "group": "inline"
         }
       ],
       "explorer/context": [

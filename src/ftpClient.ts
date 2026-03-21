@@ -85,6 +85,19 @@ export class FtpClient {
     }
   }
 
+  public async listDir(remoteDirPath: string) {
+    try {
+      const list = await this.client.list(remoteDirPath);
+      return list.map(item => ({
+        name: item.name,
+        isDirectory: item.isDirectory,
+        path: path.posix.join(remoteDirPath, item.name)
+      }));
+    } catch (err) {
+      throw err;
+    }
+  }
+
   public async close() {
     this.client.close();
   }

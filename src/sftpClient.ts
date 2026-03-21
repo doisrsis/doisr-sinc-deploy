@@ -84,6 +84,19 @@ export class SftpClient {
     }
   }
 
+  public async listDir(remoteDirPath: string) {
+    try {
+      const list = await this.client.list(remoteDirPath);
+      return list.map((item: any) => ({
+        name: item.name,
+        isDirectory: item.type === 'd',
+        path: path.posix.join(remoteDirPath, item.name)
+      }));
+    } catch (err) {
+      throw err;
+    }
+  }
+
   public async close() {
     try {
       await this.client.end();

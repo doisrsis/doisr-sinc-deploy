@@ -7,7 +7,7 @@ import { outputChannel } from './output';
 import { setContext, getRootPath, isIgnore, debounce, getNormalPath } from './utils';
 import { statusBar } from './statusBar';
 import { TaskQueue } from './taskQueue';
-import { DoisrDeployTreeDataProvider } from './treeView';
+import { DoisrDeployTreeDataProvider, ServerItem } from './treeView';
 
 export function activate(context: vscode.ExtensionContext) {
   setContext(context);
@@ -41,6 +41,57 @@ export function activate(context: vscode.ExtensionContext) {
     treeDataProvider.refresh();
   });
   context.subscriptions.push(disposableRefresh);
+
+  let disposableEditConfig = vscode.commands.registerCommand('doisr.editConfig', async () => {
+    const rootPath = getRootPath();
+    if (rootPath) {
+      const configPath = path.join(rootPath, 'doisr_deploy.jsonc');
+      if (fs.existsSync(configPath)) {
+        const document = await vscode.workspace.openTextDocument(configPath);
+        await vscode.window.showTextDocument(document);
+      }
+    }
+  });
+  context.subscriptions.push(disposableEditConfig);
+
+  let disposableSyncServer = vscode.commands.registerCommand('doisr.syncServer', async (item: ServerItem) => {
+    if (!item.config) return;
+    const { label: name, config } = item;
+    
+    // Varredura de todo o workspace enviando apenas os que não estiverem no isIgnore
+    const rootPath = getRootPath();
+    if (!rootPath) return;
+
+    outputChannel.show();
+    outputChannel.logInfo(`[${name}] Iniciando Sincronização COMPLETA do Workspace...`);
+
+    const scanDir = async (dir: string) => {
+      const files = fs.readdirSync(dir);
+      for (const file of files) {
+        const fullPath = path.join(dir, file);
+        if (await isIgnore(config, fullPath)) continue;
+
+        if (fs.statSync(fullPath).isDirectory()) {
+          await scanDir(fullPath);
+        } else {
+          const relativePath = path.relative(rootPath, fullPath);
+          const remotePath = path.posix.join(config.remotePath || '/', getNormalPath(relativePath));
+
+          TaskQueue.addTask({
+            config,
+            configName: name,
+            localPath: fullPath,
+            remotePath: remotePath,
+            operationType: 'upload',
+            isDirectory: false
+          });
+        }
+      }
+    };
+
+    await scanDir(rootPath);
+  });
+  context.subscriptions.push(disposableSyncServer);
 
   // Comando: Upload via Menu de Contexto
   let disposableUploadFile = vscode.commands.registerCommand('doisr.uploadFile', async (uri: vscode.Uri) => {
