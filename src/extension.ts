@@ -7,6 +7,7 @@ import { outputChannel } from './output';
 import { setContext, getRootPath, isIgnore, debounce, getNormalPath } from './utils';
 import { statusBar } from './statusBar';
 import { TaskQueue } from './taskQueue';
+import { DoisrDeployTreeDataProvider } from './treeView';
 
 export function activate(context: vscode.ExtensionContext) {
   setContext(context);
@@ -25,13 +26,21 @@ export function activate(context: vscode.ExtensionContext) {
   });
   context.subscriptions.push(disposableShowOutput);
 
-  // Comando: Limpar Logs/Cache
   let disposableClearCache = vscode.commands.registerCommand('doisr.clearCache', () => {
     outputChannel.clear();
     statusBar.idle();
     vscode.window.showInformationMessage('Cache e logs do Doisr Deploy limpos.');
   });
   context.subscriptions.push(disposableClearCache);
+
+  // Registro da TreeView (Aba Lateral)
+  const treeDataProvider = new DoisrDeployTreeDataProvider();
+  vscode.window.registerTreeDataProvider('doisrDeployServers', treeDataProvider);
+
+  let disposableRefresh = vscode.commands.registerCommand('doisr.refreshServers', () => {
+    treeDataProvider.refresh();
+  });
+  context.subscriptions.push(disposableRefresh);
 
   // Comando: Upload via Menu de Contexto
   let disposableUploadFile = vscode.commands.registerCommand('doisr.uploadFile', async (uri: vscode.Uri) => {

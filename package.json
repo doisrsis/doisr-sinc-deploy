@@ -51,9 +51,41 @@
         "title": "Limpar Cache da Sessão",
         "category": "Doisr Deploy",
         "icon": "$(clear-all)"
+      },
+      {
+        "command": "doisr.refreshServers",
+        "title": "Atualizar Lista",
+        "category": "Doisr Deploy",
+        "icon": "$(refresh)"
       }
     ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "doisrDeploy",
+          "title": "Doisr Deploy",
+          "icon": "resources/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "doisrDeploy": [
+        {
+          "id": "doisrDeployServers",
+          "name": "Servidores",
+          "icon": "resources/icon.svg",
+          "contextualTitle": "Doisr Deploy"
+        }
+      ]
+    },
     "menus": {
+      "view/title": [
+        {
+          "command": "doisr.refreshServers",
+          "when": "view == doisrDeployServers",
+          "group": "navigation"
+        }
+      ],
       "explorer/context": [
         {
           "submenu": "filemenu/doisr_deploy",
