@@ -1,0 +1,14 @@
+.vscode/
+.git/
+.gitignore
+src/
+docs/
+node_modules/
+out/
+*.vsix
+tsconfig.json
+webpack.config.js
+package-lock.json
+doisr_deploy.jsonc
+.DS_Store
+**/*.map
