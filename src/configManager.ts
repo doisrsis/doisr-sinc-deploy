@@ -58,7 +58,7 @@ async function createDefaultConfig(configPath: string): Promise<null> {
     "username": "seu_usuario",
     "password": "sua_senha",
     "secure": true, // Mude para "implicit" se der erro ECONNRESET, ou false para conexão sem TLS
-    "remotePath": "/public_html",  // Pasta no servidor onde os arquivos serão salvos
+    "remotePath": "/",  // Pasta no servidor onde os arquivos serão salvos
 
     "upload_on_save": true, // Sobe tudo que você salvar na hora
     "watch": false,         // Ignorado quando upload_on_save=true

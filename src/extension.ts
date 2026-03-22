@@ -355,7 +355,7 @@ export function activate(context: vscode.ExtensionContext) {
     "username": "seu_usuario",
     "password": "sua_senha",
     "secure": true,
-    "remotePath": "/public_html",
+    "remotePath": "/",
 
     "upload_on_save": false,
     "watch": false,
