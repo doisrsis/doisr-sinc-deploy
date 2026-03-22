@@ -17,6 +17,7 @@ export interface SyncConfigItem {
   default?: boolean;
   excludePath?: string[];
   deleteRemote?: boolean;
+  confirm?: boolean;
 
   // Build Pré-Sync
   build?: string;        // Comando de build (ex: "npm run build")

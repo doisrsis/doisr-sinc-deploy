@@ -31,8 +31,14 @@ No painel lateral, passe o mouse sobre o nome do servidor para acessar comandos 
 ### 📁 Upload de Pastas Inteiras
 Com a estrutura local aberta via explorador padrão, clique com o botão direito numa pasta cheia de arquivos e escolha **"Doisr Deploy (Sincronizar) > Fazer Upload"**. A varredura recursiva enfileira tudo e envia sem dor de cabeça.
 
-### 🖥️ Multi-Servidor
-Configure quantos servidores quiser no mesmo arquivo. Cada chave raiz é um ambiente separado (produção, homologação, cliente X). Se vários tiverem `upload_on_save: true`, o arquivo é enviado para **todos** ao salvar.
+### 🛡️ Confirmação de Segurança
+Com `"confirm": true`, a extensão exibe um **popup de confirmação** antes de qualquer operação (upload, sync, deleção) naquele servidor. Ideal para proteção de servidores de produção — evita publicar o que não deve por acidente. A barra de status também mostra o nome do servidor para onde o arquivo está sendo enviado.
+
+### �️ Multi-Servidor
+Configure quantos servidores quiser no mesmo arquivo. Cada chave raiz é um ambiente separado (produção, homologação, cliente X). Se vários tiverem `upload_on_save: true`, o arquivo é enviado para **todos** ao salvar. Use o botão **[ + ]** no header do painel lateral para adicionar novos servidores facilmente.
+
+### 📊 Status Bar com Nome do Servidor
+A barra de status do editor agora exibe o nome do servidor para onde o arquivo está sendo enviado, garantindo que você saiba exatamente para onde o seu arquivo está indo.
 
 ---
 
@@ -57,6 +63,7 @@ Configure quantos servidores quiser no mesmo arquivo. Cada chave raiz é um ambi
     "upload_on_save": true,       // Upload instantâneo ao salvar
     "watch": false,               // Ignorado quando upload_on_save=true
     "deleteRemote": true,         // Ao deletar local, deleta no servidor também
+    "confirm": false,             // Se true, pede confirmação antes de cada operação
     "default": true,              // Config padrão para menu de contexto
 
     // Build Pré-Sync (opcional) — usado pelo botão "Sincronizar Workspace"
@@ -78,20 +85,26 @@ Basta adicionar outra chave ao JSON:
 
 ```jsonc
 {
+  "homologacao": {
+    "type": "ftp",
+    "host": "servidor-homolog.com.br",
+    "upload_on_save": true,    // Auto-sync ao salvar
+    "confirm": false,          // Sem popup (ambiente seguro)
+    "default": true
+    // ...
+  },
   "producao": {
     "type": "ftp",
     "host": "servidor-producao.com.br",
-    // ...
-    "default": true
-  },
-  "homologacao": {
-    "type": "sftp",
-    "host": "servidor-homolog.com.br",
-    // ...
+    "upload_on_save": false,   // NÃO sobe automaticamente
+    "confirm": true,           // Pede confirmação no sync manual
     "default": false
+    // ...
   }
 }
 ```
+
+Nesse cenário: **salvar** envia só para homologação (silencioso). Produção só recebe via sync manual no painel lateral, com popup de confirmação.
 
 ---
 
@@ -110,6 +123,7 @@ Basta adicionar outra chave ao JSON:
 | `upload_on_save` | `boolean` | `true` | Upload automático ao salvar |
 | `watch` | `boolean` | `false` | Detectar modificações de terceiros |
 | `deleteRemote` | `boolean` | `true` | Deletar no servidor ao deletar local |
+| `confirm` | `boolean` | `false` | Pedir confirmação antes de cada operação |
 | `default` | `boolean` | — | Config padrão para menu de contexto |
 | `build` | `string` | — | Comando de build pré-sync |
 | `buildOutputDir` | `string` | — | Pasta de saída do build |

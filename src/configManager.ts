@@ -30,6 +30,7 @@ export async function getConfigManager(): Promise<{ [key: string]: SyncConfigIte
           upload_on_save: true,
           watch: false,
           deleteRemote: true,
+          confirm: false,
           excludePath: ['.git', 'node_modules', '*.log'],
           ...parsedData[key]
         };
@@ -62,6 +63,7 @@ async function createDefaultConfig(configPath: string): Promise<null> {
     "upload_on_save": true, // Sobe tudo que você salvar na hora
     "watch": false,         // Ignorado quando upload_on_save=true
     "deleteRemote": true,   // Ao deletar arquivo local, deleta no FTP também
+    "confirm": false,       // Se true, pede confirmação antes de cada operação
     "default": true,        // Considerado como config padrão para menu de contexto
 
     // Build Pré-Sync (opcional) — usado pelo botão "Sincronizar Workspace"

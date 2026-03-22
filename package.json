@@ -3,7 +3,7 @@
   "displayName": "doisr-deploy (FTP/SFTP)",
   "description": "Ferramenta de sincronização FTP/SFTP/SSH para o dia a dia. Sobe arquivos automaticamente ao salvar.",
   "icon": "logo.png",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "publisher": "DoisRSSistemas",
   "author": "Rafael Dias - doisr.com.br",
   "license": "MIT",
@@ -74,6 +74,12 @@
         "title": "Editar doisr_deploy.jsonc",
         "category": "Doisr Deploy",
         "icon": "$(edit)"
+      },
+      {
+        "command": "doisr.addServer",
+        "title": "Adicionar Servidor",
+        "category": "Doisr Deploy",
+        "icon": "$(add)"
       }
     ],
     "viewsContainers": {
@@ -97,6 +103,11 @@
     },
     "menus": {
       "view/title": [
+        {
+          "command": "doisr.addServer",
+          "when": "view == doisrDeployServers",
+          "group": "navigation"
+        },
         {
           "command": "doisr.refreshServers",
           "when": "view == doisrDeployServers",

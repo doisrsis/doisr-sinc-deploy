@@ -62,6 +62,19 @@ export function activate(context: vscode.ExtensionContext) {
     const rootPath = getRootPath();
     if (!rootPath) return;
 
+    // ── Confirmação de segurança ────────────────────────────────────────
+    if (config.confirm) {
+      const answer = await vscode.window.showWarningMessage(
+        `Doisr Deploy: Sincronizar workspace inteiro com "${name}" (${config.host})?`,
+        { modal: true },
+        'Sim, sincronizar'
+      );
+      if (answer !== 'Sim, sincronizar') {
+        outputChannel.logInfo(`[${name}] Sincronização cancelada pelo usuário.`);
+        return;
+      }
+    }
+
     outputChannel.show();
 
     // ── Build Pré-Sync ──────────────────────────────────────────────────
@@ -144,6 +157,18 @@ export function activate(context: vscode.ExtensionContext) {
       return;
     }
 
+    // Confirmação de segurança para upload via menu de contexto
+    if (config.confirm) {
+      const answer = await vscode.window.showWarningMessage(
+        `Doisr Deploy: Enviar para "${name}" (${config.host})?`,
+        'Sim', 'Não'
+      );
+      if (answer !== 'Sim') {
+        outputChannel.logInfo(`[${name}] Upload cancelado pelo usuário.`);
+        return;
+      }
+    }
+
     const fsPath = uri.fsPath;
     const stat = fs.statSync(fsPath);
 
@@ -223,7 +248,20 @@ export function activate(context: vscode.ExtensionContext) {
         const relativePath = path.relative(rootPath, filePath);
         const remotePath = path.posix.join(config.remotePath || '/', getNormalPath(relativePath));
 
+        // Confirmação de segurança para uploads automáticos
+        if (config.confirm) {
+          const answer = await vscode.window.showWarningMessage(
+            `Doisr Deploy: Enviar "${relativePath}" para "${name}" (${config.host})?`,
+            'Sim', 'Não'
+          );
+          if (answer !== 'Sim') {
+            outputChannel.logInfo(`[${name}] Upload cancelado pelo usuário: ${relativePath}`);
+            continue;
+          }
+        }
+
         outputChannel.logInfo(`[${name}] ${source === 'watch' ? 'Modificação detectada (Watcher)' : 'Salvamento detectado'}: ${relativePath}`);
+        statusBar.working(`↑ ${name}: ${relativePath}`);
 
         TaskQueue.addTask({
           config,
@@ -264,6 +302,19 @@ export function activate(context: vscode.ExtensionContext) {
       const relativePath = path.relative(rootPath, filePath);
       const remotePath = path.posix.join(config.remotePath || '/', getNormalPath(relativePath));
 
+      // Confirmação de segurança para deleção remota
+      if (config.confirm) {
+        const answer = await vscode.window.showWarningMessage(
+          `Doisr Deploy: Deletar "${relativePath}" do servidor "${name}" (${config.host})?`,
+          { modal: true },
+          'Sim, deletar'
+        );
+        if (answer !== 'Sim, deletar') {
+          outputChannel.logInfo(`[${name}] Deleção remota cancelada pelo usuário: ${relativePath}`);
+          continue;
+        }
+      }
+
       outputChannel.logInfo(`[${name}] Deleção detectada — removendo do servidor: ${relativePath}`);
 
       TaskQueue.addTask({
@@ -276,6 +327,71 @@ export function activate(context: vscode.ExtensionContext) {
       });
     }
   };
+
+  // ── Comando: Adicionar Servidor ──────────────────────────────────────
+  let disposableAddServer = vscode.commands.registerCommand('doisr.addServer', async () => {
+    const rootPath = getRootPath();
+    if (!rootPath) return;
+
+    const configPath = path.join(rootPath, 'doisr_deploy.jsonc');
+
+    const serverName = await vscode.window.showInputBox({
+      prompt: 'Nome do servidor (ex: homologacao, producao, cliente_x)',
+      placeHolder: 'homologacao',
+      validateInput: (value) => {
+        if (!value || value.trim().length === 0) { return 'O nome não pode ser vazio'; }
+        if (/\s/.test(value)) { return 'Use underscores ao invés de espaços'; }
+        return null;
+      }
+    });
+    if (!serverName) { return; }
+
+    const newServerBlock = `
+  ,
+  "${serverName}": {
+    "type": "ftp",
+    "host": "ftp.seusite.com.br",
+    "port": 21,
+    "username": "seu_usuario",
+    "password": "sua_senha",
+    "secure": true,
+    "remotePath": "/public_html",
+
+    "upload_on_save": false,
+    "watch": false,
+    "deleteRemote": false,
+    "confirm": true,
+    "default": false,
+
+    "excludePath": [
+      ".git",
+      "node_modules",
+      "doisr_deploy.jsonc"
+    ]
+  }`;
+
+    if (!fs.existsSync(configPath)) {
+      await getConfigManager();
+      return;
+    }
+
+    const content = fs.readFileSync(configPath, 'utf-8');
+    const lastBrace = content.lastIndexOf('}');
+    if (lastBrace === -1) { return; }
+
+    const secondLastBrace = content.lastIndexOf('}', lastBrace - 1);
+    if (secondLastBrace === -1) { return; }
+
+    const newContent = content.slice(0, secondLastBrace + 1) + newServerBlock + '\n' + content.slice(lastBrace);
+    fs.writeFileSync(configPath, newContent, 'utf-8');
+
+    const document = await vscode.workspace.openTextDocument(configPath);
+    await vscode.window.showTextDocument(document);
+    treeDataProvider.refresh();
+
+    vscode.window.showInformationMessage(`Servidor "${serverName}" adicionado! Preencha os dados de conexão.`);
+  });
+  context.subscriptions.push(disposableAddServer);
 
   // Listener: File System Watcher
   const watcher = vscode.workspace.createFileSystemWatcher('**/*');
