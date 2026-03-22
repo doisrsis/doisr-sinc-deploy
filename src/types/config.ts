@@ -16,6 +16,11 @@ export interface SyncConfigItem {
   watch?: boolean;
   default?: boolean;
   excludePath?: string[];
+  deleteRemote?: boolean;
+
+  // Build Pré-Sync
+  build?: string;        // Comando de build (ex: "npm run build")
+  buildOutputDir?: string; // Pasta de saída do build (ex: "dist")
 }
 
 export type OperationType = 'upload' | 'download' | 'delete' | 'rename';
@@ -27,7 +32,7 @@ export interface Task {
   remotePath: string;
   operationType: OperationType;
   isDirectory: boolean;
-  
+
   // Status da Tarefa
   progress?: number;
   error?: string;

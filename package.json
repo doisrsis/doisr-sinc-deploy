@@ -2,6 +2,7 @@
   "name": "doisr-deploy",
   "displayName": "doisr-deploy (FTP/SFTP)",
   "description": "Ferramenta de sincronização FTP/SFTP/SSH para o dia a dia. Sobe arquivos automaticamente ao salvar.",
+  "icon": "logo.png",
   "version": "1.0.0",
   "publisher": "rafaeldias",
   "author": "Rafael Dias - doisr.com.br",

@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs-extra';
+import { exec } from 'child_process';
 // @ts-ignore
 import { getConfigManager, getDefaultConfig } from './configManager';
 import { outputChannel } from './output';
@@ -57,24 +58,60 @@ export function activate(context: vscode.ExtensionContext) {
   let disposableSyncServer = vscode.commands.registerCommand('doisr.syncServer', async (item: ServerItem) => {
     if (!item.config) return;
     const { label: name, config } = item;
-    
-    // Varredura de todo o workspace enviando apenas os que não estiverem no isIgnore
+
     const rootPath = getRootPath();
     if (!rootPath) return;
 
     outputChannel.show();
-    outputChannel.logInfo(`[${name}] Iniciando Sincronização COMPLETA do Workspace...`);
+
+    // ── Build Pré-Sync ──────────────────────────────────────────────────
+    if (config.build) {
+      outputChannel.logInfo(`[${name}] Executando build: ${config.build}`);
+      statusBar.working('Build em andamento...');
+
+      const buildSuccess = await new Promise<boolean>((resolve) => {
+        exec(config.build!, { cwd: rootPath, maxBuffer: 10 * 1024 * 1024 }, (error, stdout, stderr) => {
+          if (stdout) { outputChannel.logInfo(`[${name}] Build stdout:\n${stdout.slice(-2000)}`); }
+          if (stderr) { outputChannel.logInfo(`[${name}] Build stderr:\n${stderr.slice(-2000)}`); }
+          if (error) {
+            outputChannel.logError(`[${name}] Build falhou! Sync cancelado.`, error.message);
+            statusBar.error('Build falhou');
+            vscode.window.showErrorMessage(`Doisr Deploy: Build falhou — ${error.message}`);
+            resolve(false);
+          } else {
+            outputChannel.logSuccess(`[${name}] Build concluído com sucesso!`);
+            resolve(true);
+          }
+        });
+      });
+
+      if (!buildSuccess) { return; }
+    }
+
+    // ── Determinar pasta-fonte do sync ───────────────────────────────────
+    let syncRoot = rootPath;
+    if (config.build && config.buildOutputDir) {
+      syncRoot = path.join(rootPath, config.buildOutputDir);
+      if (!fs.existsSync(syncRoot)) {
+        outputChannel.logError(`[${name}] Pasta de saída do build não encontrada: ${config.buildOutputDir}`);
+        vscode.window.showErrorMessage(`Doisr Deploy: Pasta ${config.buildOutputDir} não existe após o build.`);
+        return;
+      }
+      outputChannel.logInfo(`[${name}] Sincronizando apenas a pasta de build: ${config.buildOutputDir}`);
+    }
+
+    outputChannel.logInfo(`[${name}] Iniciando Sincronização COMPLETA${config.build ? ' (pós-build)' : ''}...`);
 
     const scanDir = async (dir: string) => {
       const files = fs.readdirSync(dir);
       for (const file of files) {
         const fullPath = path.join(dir, file);
-        if (await isIgnore(config, fullPath)) continue;
+        if (await isIgnore(config, fullPath)) { continue; }
 
         if (fs.statSync(fullPath).isDirectory()) {
           await scanDir(fullPath);
         } else {
-          const relativePath = path.relative(rootPath, fullPath);
+          const relativePath = path.relative(syncRoot, fullPath);
           const remotePath = path.posix.join(config.remotePath || '/', getNormalPath(relativePath));
 
           TaskQueue.addTask({
@@ -89,14 +126,14 @@ export function activate(context: vscode.ExtensionContext) {
       }
     };
 
-    await scanDir(rootPath);
+    await scanDir(syncRoot);
   });
   context.subscriptions.push(disposableSyncServer);
 
   // Comando: Upload via Menu de Contexto
   let disposableUploadFile = vscode.commands.registerCommand('doisr.uploadFile', async (uri: vscode.Uri) => {
     if (!uri) return;
-    
+
     outputChannel.show();
     const defaultConfig = await getDefaultConfig();
     if (!defaultConfig) return;
@@ -109,7 +146,7 @@ export function activate(context: vscode.ExtensionContext) {
 
     const fsPath = uri.fsPath;
     const stat = fs.statSync(fsPath);
-    
+
     // Função para enfileirar arquivos
     const queueFile = (filePath: string) => {
       const rootPath = getRootPath(filePath);
@@ -129,7 +166,7 @@ export function activate(context: vscode.ExtensionContext) {
     if (stat.isDirectory()) {
       // Varredura recursiva de diretório
       outputChannel.logInfo(`[${name}] Preparando upload do diretório: ${fsPath}`);
-      
+
       const scanDir = (dir: string) => {
         const files = fs.readdirSync(dir);
         for (const file of files) {
@@ -141,7 +178,7 @@ export function activate(context: vscode.ExtensionContext) {
           }
         }
       };
-      
+
       scanDir(fsPath);
       return;
     }
@@ -159,10 +196,10 @@ export function activate(context: vscode.ExtensionContext) {
 
     if (filePending.has(filePath)) return;
     filePending.add(filePath);
-    
+
     setTimeout(async () => {
       filePending.delete(filePath);
-      
+
       try {
         const stat = fs.statSync(filePath);
         if (stat.isDirectory()) return; // Por ora, ignorar subida de pastas isoladas
@@ -181,7 +218,7 @@ export function activate(context: vscode.ExtensionContext) {
         if (ignored) continue;
 
         const rootPath = getRootPath(filePath);
-        if (!filePath.startsWith(rootPath)) continue; 
+        if (!filePath.startsWith(rootPath)) continue;
 
         const relativePath = path.relative(rootPath, filePath);
         const remotePath = path.posix.join(config.remotePath || '/', getNormalPath(relativePath));
@@ -203,21 +240,56 @@ export function activate(context: vscode.ExtensionContext) {
   // Listener: On Save Document
   context.subscriptions.push(
     vscode.workspace.onDidSaveTextDocument((document) => {
-       if (document.uri.scheme !== 'file') return;
-       handleFileChange(document.uri.fsPath, 'save');
+      if (document.uri.scheme !== 'file') return;
+      handleFileChange(document.uri.fsPath, 'save');
     })
   );
 
+  // ── Handler: Deleção Remota Sincronizada ──────────────────────────────
+  const handleFileDelete = async (filePath: string) => {
+    if (filePath.includes('.git') || filePath.includes('node_modules') || filePath.includes('.vscode')) { return; }
+
+    const configs = await getConfigManager();
+    if (!configs) { return; }
+
+    for (const [name, config] of Object.entries(configs)) {
+      if (!config.deleteRemote) { continue; }
+
+      const ignored = await isIgnore(config, filePath);
+      if (ignored) { continue; }
+
+      const rootPath = getRootPath(filePath);
+      if (!filePath.startsWith(rootPath)) { continue; }
+
+      const relativePath = path.relative(rootPath, filePath);
+      const remotePath = path.posix.join(config.remotePath || '/', getNormalPath(relativePath));
+
+      outputChannel.logInfo(`[${name}] Deleção detectada — removendo do servidor: ${relativePath}`);
+
+      TaskQueue.addTask({
+        config,
+        configName: name,
+        localPath: filePath,
+        remotePath: remotePath,
+        operationType: 'delete',
+        isDirectory: false
+      });
+    }
+  };
+
   // Listener: File System Watcher
   const watcher = vscode.workspace.createFileSystemWatcher('**/*');
-  
+
   watcher.onDidChange(uri => {
-    if (uri.scheme === 'file') handleFileChange(uri.fsPath, 'watch');
+    if (uri.scheme === 'file') { handleFileChange(uri.fsPath, 'watch'); }
   });
   watcher.onDidCreate(uri => {
-    if (uri.scheme === 'file') handleFileChange(uri.fsPath, 'watch');
+    if (uri.scheme === 'file') { handleFileChange(uri.fsPath, 'watch'); }
   });
-  
+  watcher.onDidDelete(uri => {
+    if (uri.scheme === 'file') { handleFileDelete(uri.fsPath); }
+  });
+
   context.subscriptions.push(watcher);
 }
 

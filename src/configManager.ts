@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs-extra';
 // @ts-ignore
-import { parse } from 'jsonc-parser'; 
+import { parse } from 'jsonc-parser';
 import { SyncConfigItem } from './types/config';
 import { getRootPath } from './utils';
 import { outputChannel } from './output';
@@ -12,7 +12,7 @@ export async function getConfigManager(): Promise<{ [key: string]: SyncConfigIte
   if (!rootPath) return null;
 
   const configPath = path.join(rootPath, 'doisr_deploy.jsonc');
-  
+
   // Se o config não existe, cria um config base (wizard básico)
   if (!fs.existsSync(configPath)) {
     return createDefaultConfig(configPath);
@@ -21,13 +21,15 @@ export async function getConfigManager(): Promise<{ [key: string]: SyncConfigIte
   try {
     const data = fs.readFileSync(configPath, 'utf-8');
     const parsedData = parse(data) as { [key: string]: SyncConfigItem };
-    
+
     // Tratamento para garantir defaults
     for (const key in parsedData) {
       if (parsedData.hasOwnProperty(key)) {
         parsedData[key] = {
+          secure: true,
           upload_on_save: true,
           watch: false,
+          deleteRemote: true,
           excludePath: ['.git', 'node_modules', '*.log'],
           ...parsedData[key]
         };
@@ -47,19 +49,25 @@ async function createDefaultConfig(configPath: string): Promise<null> {
   const initialConfig = `{
   // Arquivo de configuração - doisr-deploy
   // Configure aqui seus ambientes de desenvolvimento/produção
-  
+
   "producao": {
     "type": "ftp", // ou "sftp"
     "host": "ftp.seusite.com.br",
     "port": 21,
     "username": "seu_usuario",
     "password": "sua_senha",
-    "secure": false, // Mude para verdadeiro (true ou "implicit") se der erro ECONNRESET
+    "secure": true, // Mude para "implicit" se der erro ECONNRESET, ou false para conexão sem TLS
     "remotePath": "/public_html",  // Pasta no servidor onde os arquivos serão salvos
 
     "upload_on_save": true, // Sobe tudo que você salvar na hora
-    "watch": false,         // Ignorado se upload_on_save=true
+    "watch": false,         // Ignorado quando upload_on_save=true
+    "deleteRemote": true,   // Ao deletar arquivo local, deleta no FTP também
     "default": true,        // Considerado como config padrão para menu de contexto
+
+    // Build Pré-Sync (opcional) — usado pelo botão "Sincronizar Workspace"
+    // "build": "npm run build",       // Comando de build a executar antes do sync
+    // "buildOutputDir": "dist",       // Pasta gerada pelo build que será enviada ao FTP
+
     "excludePath": [
       ".git",
       "node_modules",
@@ -69,12 +77,12 @@ async function createDefaultConfig(configPath: string): Promise<null> {
 }`;
 
   fs.writeFileSync(configPath, initialConfig, 'utf-8');
-  
+
   const document = await vscode.workspace.openTextDocument(configPath);
   await vscode.window.showTextDocument(document);
-  
+
   vscode.window.showInformationMessage('Arquivo de configuração doisr_deploy.jsonc criado. Preencha seus dados!');
-  
+
   return null;
 }
 

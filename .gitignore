@@ -4,3 +4,5 @@ out/
 .vscode-test/
 *.vsix
 .DS_Store
+doisr_deploy.jsonc
+logo.png
